@@ -1,0 +1,20 @@
+# Build folders
+firmware/Debug/
+firmware/.settings/
+firmware/.ai/
+
+# CubeIDE temp files
+*.launch
+*.log
+
+# Object files / binaries
+*.o
+*.elf
+*.map
+*.d
+
+
+firmware/Drivers/
+firmware/Middlewares/
+firmware/USB_HOST/
+firmware/FATFS/
