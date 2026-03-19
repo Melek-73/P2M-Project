@@ -1,66 +1,164 @@
-# P2M-Project
-Edge AI for Computer Vision on MCUs ; An Edge AI project focused on deploying optimized computer vision models (CNNs) on embedded MCU (STM32) devices for real-time inference.
+# P2M – Embedded AI-Based Gesture-Controlled Industrial HMI System
 
-### Hand Gesture Recognition : CNN for STM32F7
+## 1. Problem Description
 
-**Goal**  
-Build a robust hand gesture recognition model by combining two datasets and prepare it for embedded deployment (TinyML / STM32).
+Modern manufacturing environments rely heavily on **Human-Machine Interfaces (HMIs)** to monitor and control industrial processes such as temperature, motor speed, and machine status. Traditional HMIs (buttons, touchscreens) present several limitations:
 
-## Datasets Used
+- Physical contact is required → not ideal in harsh or contaminated environments
+- Operators may wear gloves → touch interaction becomes unreliable
+- Repetitive manual interaction → reduces efficiency and ergonomics
+- Limited flexibility in interaction design
 
-| Dataset              | Sensor       | Images   | Resolution | Classes | Notes                              |
-|----------------------|--------------|----------|------------|---------|------------------------------------|
-| LeapGestRecog        | Leap Motion  | ~20k     | 240×640×3    | 10      | Infrared, very controlled          |
-| RYN-HGD 2.0 (grayscale) | Webcam    | ~31k     | 256×256×3    | 10      | Real-world conditions              |
-| **Merged**           | —            | **51 081** | —        | 10      | Final training set                 |
+There is a need for a **contactless**, **intuitive**, and **intelligent** interface that improves operator interaction while maintaining reliability in industrial conditions.
 
-**Classes (10)**:  
-`01_palm`, `02_l`, `03_fist`, `04_fist_moved`, `05_thumb`, `06_index`, `07_ok`, `08_palm_moved`, `09_c`, `10_down`
+## 2. Proposed Solution
 
-## Pipeline Summary
+This project introduces a **gesture-controlled embedded HMI system** based on:
 
-1. **Merging strategy**  
-   - Copied RYN-HGD directly  
-   - Added Leap images with subject prefix (`subject_folder_frame_…`) to avoid overwrites  
-   → Final structure: one folder per class
+- An **embedded AI model** running on a microcontroller
+- A **camera** capturing user hand gestures
+- A **real-time interface** displayed on an LCD
+- Gesture-based navigation and control of machine parameters
 
-2. **Class balance** (after merge)  
-   ≈ 4800–5200 images per class → reasonably balanced
+The system enables operators to interact with industrial dashboards using simple hand gestures such as:
 
-3. **Preprocessing**  
-   - Grayscale (1 channel)  
-   - Resize → **64×64**  
-   - Normalize [0,1]
+- 👉 **Swipe right** → Next screen
+- 👈 **Swipe left** → Previous screen
+- ✊ **Fist** → Stop machine
+- 🖐 **Palm** → Open menu
 
-4. **Data split**  
-   - Stratified train/val/test (~70/15/15)  
+This creates a **touchless**, **intuitive** control system suitable for industrial environments.
 
-5. **Model Architecture** (lightweight CNN)  
-   - Several Conv2D + MaxPool + BatchNorm + Dropout layers  
-   - GlobalAveragePooling or Flatten → Dense → 10 softmax  
-   - Designed to be small enough for microcontroller
+## 3. Use Case: Smart Manufacturing Dashboard
 
-6. **Training result**  
-   - Test accuracy (float32): **~89.9–90.1%**  
-   - Main confusions:  
-     - `03_fist` ↔ `04_fist_moved`  
-     - `01_palm` ↔ `08_palm_moved`  
-     → caused mostly by near-identical samples in RYN-HGD dataset
+**Scenario**  
+An operator supervises a production machine using an LCD dashboard displaying:
 
-7. **TinyML / STM32 Deployment**  
-   - Converted to **fully integer-quantized TFLite** (int8)  
-   - Final model size: **~14 KB**  
-   - Quantized test accuracy: **~89.4%** (very small drop)  
-   - Generated `model_data.h` → C array ready for STM32 firmware
+- 🌡 Temperature
+- ⚙ Motor speed (RPM)
+- ✅ Machine status (Running / Stopped)
 
-## Key Takeaways
+Instead of using buttons or touch:
 
-- Merging infrared + webcam data → better generalization  
-- Model performs well overall, but **dataset ambiguity** (especially palm/palm-moved and fist/fist-moved) is the main error source  
-- 14 KB int8 model → realistic for STM32F7 / similar low-power MCUs
+- The operator performs gestures in front of the camera
+- The system recognizes the gesture using embedded AI
+- The interface reacts instantly (navigation or control action)
 
-**Final deliverables**  
-- `stm32_gesture_model.tflite`  
-- `model_data.h` (C header for embedded inference)
+## 4. System Architecture
+Camera → Preprocessing → AI Model → Decision Logic → LCD Interface
+### High-Level Architecture
 
-→ Ready for real-time hand gesture control on microcontroller!
+### Hardware Components
+
+- **Microcontroller**: STM32F746NG  
+  - Cortex-M7 core  
+  - Executes AI inference and system logic
+- **Camera Sensor**: OV5640  
+  - Captures real-time images of user gestures
+- **Display**: TFT LCD (LTDC interface)  
+  - Displays industrial dashboard and UI
+- **Memory**: Internal SRAM / External SDRAM  
+  - Stores frame buffers and AI data
+
+### Software Components
+
+- **Embedded AI Runtime**: X-CUBE-AI
+- **RTOS**: FreeRTOS (task scheduling)
+- **HAL Drivers**: STM32 HAL (DCMI, LTDC, DMA)
+- **Application Layer**: Gesture recognition + UI logic
+
+## 5. System Workflow
+
+Step-by-step execution:
+
+1. **Image Acquisition**  
+   Camera captures a frame via DCMI + DMA  
+   Image stored in frame buffer
+
+2. **Preprocessing**  
+   Resize image (e.g., 320×240 → 64×64)  
+   Convert format (RGB → grayscale or normalized RGB)  
+   Normalize pixel values (e.g., -128 to 127)
+
+3. **AI Inference**  
+   Processed image is fed into the neural network  
+   Model outputs probabilities for gesture classes
+
+4. **Decision Logic**  
+   Highest probability → predicted gesture  
+   Gesture mapped to system action
+
+5. **UI Update**  
+   LCD interface updated accordingly  
+   Example:  
+   - Gesture = “Fist” → Machine status = STOPPED  
+   - Gesture = “Swipe Right” → Next dashboard page
+
+## 6. User Interface (UI/UX Design)
+
+The LCD displays a professional industrial dashboard:
+
+### Interaction Model
+
+| Gesture     | Action          |
+|-------------|-----------------|
+| 🖐 Palm     | Open menu       |
+| 👉 Swipe Right | Next screen  |
+| 👈 Swipe Left  | Previous screen |
+| ✊ Fist      | Stop machine    |
+
+## 7. AI Model Description
+
+- **Type**: Image classification model
+- **Input**: 64×64 image (grayscale or RGB)
+- **Output**: Gesture class (e.g., 10 classes)
+
+### Processing Pipeline
+Image → Quantization → Tensor → Inference → Output Vector
+**Output Example**
+[0.01, 0.02, 0.85, 0.03, ...]
+→ Predicted class = 2
+
+
+## 8. Technical Concepts Used
+
+- **Embedded AI** — Running neural networks directly on microcontrollers using optimized inference engines
+- **Quantization** — Reducing model precision (float → int8) to decrease memory usage and increase speed
+- **DMA** (Direct Memory Access) — Transfers camera data without CPU intervention
+- **DCMI** (Digital Camera Interface) — Hardware peripheral for image capture
+- **Cache Coherency** (STM32F7) — Managing CPU cache when using DMA
+- **Real-Time Systems** (FreeRTOS) — Deterministic execution and task scheduling
+
+## 9. System Constraints & Challenges
+
+- Limited memory (embedded environment)
+- Real-time processing requirements
+- Camera noise vs model accuracy
+- Cache and DMA synchronization issues
+- Optimization of inference time
+
+## 10. Results (Current Progress)
+
+- ✅ AI model deployed and running on STM32
+- ✅ Correct classification on test images
+- ✅ LCD visualization working (color mapping)
+- 🔄 Camera integration in progress
+
+## 11. Future Improvements
+
+- Real-time camera-based inference
+- Advanced UI/UX (multi-screen navigation)
+- Finger tracking (cursor-like interaction)
+- Model optimization (latency reduction)
+- Integration with real industrial sensors
+
+## 12. Conclusion
+
+This project demonstrates the feasibility of combining **embedded systems**, **artificial intelligence**, and **human-centered interaction** to build a next-generation industrial HMI.
+
+The system transforms traditional machine control into a **contactless**, **intelligent**, and **interactive** experience, opening the door to smarter and safer manufacturing environments.
+
+---
+
+**👨‍💻 Author**  
+Melek Fourati
