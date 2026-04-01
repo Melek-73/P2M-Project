@@ -29,13 +29,21 @@
 #include "test_image.h"
 #include "lcd_utils.h"
 #include "freertos.h"
+#include "camera.h"
 
 extern void StartHGRTask(void const * argument);
+extern void StartCameraTask(void const * argument);
 
 // Standard SDRAM address for STM32F746G-DISCO LCD Framebuffer
 #define LCD_FRAMEBUFFER_ADDR    0xC0000000
 #define LCD_WIDTH               480
 #define LCD_HEIGHT              272
+
+#define CAM_WIDTH   320
+#define CAM_HEIGHT  240
+extern uint16_t frame_buffer[CAM_WIDTH * CAM_HEIGHT];
+volatile uint8_t frame_ready = 0;
+
 
 /* USER CODE END Includes */
 
@@ -216,6 +224,9 @@ int main(void)
   // Initialize SDRAM BEFORE LTDC
   extern SDRAM_HandleTypeDef hsdram1;
   SDRAM_Initialization_Sequence(&hsdram1);
+  //Enable interrupt handler
+  HAL_NVIC_SetPriority(DCMI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DCMI_IRQn);
 
   MX_LTDC_Init();
   MX_QUADSPI_Init();
@@ -235,9 +246,25 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
+  //Enable camera power
   /* USER CODE END 2 */
 
-  /* USER CODE BEGIN RTOS_MUTEX */
+  /* === CORRECT CAMERA POWER-UP SEQUENCE (OV5640 / MB1379) === */
+
+  /* 1. Power ON: PWDN = low (de-assert POWER_DOWN, active high) */
+  HAL_GPIO_WritePin(DCMI_PWR_EN_GPIO_Port, DCMI_PWR_EN_Pin, GPIO_PIN_RESET);
+  HAL_Delay(10);                     // wait for internal regulators to stabilize
+
+  /* 2. Assert reset (active low) */
+  HAL_GPIO_WritePin(EXT_RST_GPIO_Port, EXT_RST_Pin, GPIO_PIN_RESET);
+  HAL_Delay(10);
+
+  /* 3. Release reset */
+  HAL_GPIO_WritePin(EXT_RST_GPIO_Port, EXT_RST_Pin, GPIO_PIN_SET);
+  HAL_Delay(20);                     // OV5640 needs ≥20 ms before SCCB (I2C) init
+
+  /* Optional: if your Camera_Capture() only starts DMA, you can keep it or remove it */
+  /* Camera_Capture(); */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
@@ -258,24 +285,44 @@ int main(void)
   //osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 4096);
   //defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  osThreadDef(HGR, StartHGRTask, osPriorityNormal, 0, 512);
-  osThreadCreate(osThread(HGR), NULL);
+  //Camera_Capture();
+  //osThreadDef(HGR, StartHGRTask, osPriorityNormal, 0, 512);
+  //osThreadCreate(osThread(HGR), NULL);
 
+  //osThreadDef(CameraTask, StartCameraTask, osPriorityAboveNormal, 0, 1024);
+  //osThreadCreate(osThread(CameraTask), NULL);
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
-  osKernelStart();
+  //osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   //uint8_t test_class = 4;
-  while (1)
-  {
 
+  Camera_Init();
+
+  // --- Camera Capture ---
+  Camera_Capture();
+
+  // Wait until image captured
+  while(!Camera_IsFrameReady());
+
+  // --- Fill LCD black ---
+  uint16_t* lcd = (uint16_t*)LCD_FRAMEBUFFER_ADDR;
+  for(int i = 0; i < 480*272; i++)
+  {
+      lcd[i] = 0xF800;  // RGB565 black
+  }
+
+  // Keep the system running
+  while(1)
+  {
+      HAL_Delay(1000);
   }
   /* USER CODE END 3 */
 }

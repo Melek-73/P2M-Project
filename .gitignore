@@ -1,20 +1,39 @@
+# =========================
 # Build folders
-firmware/Debug/
-firmware/.settings/
-firmware/.ai/
+# =========================
+Debug/
+Release/
 
-# CubeIDE temp files
+# =========================
+# STM32CubeIDE / Eclipse
+# =========================
+.settings/
 *.launch
+.metadata/
+
+# =========================
+# Logs
+# =========================
 *.log
 
-# Object files / binaries
+# =========================
+# Compiled / generated files
+# =========================
 *.o
 *.elf
 *.map
 *.d
+*.bin
+*.hex
+*.list
 
+# =========================
+# AI generated files
+# =========================
+.ai/
 
-firmware/Drivers/
-firmware/Middlewares/
-firmware/USB_HOST/
-firmware/FATFS/
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.swp

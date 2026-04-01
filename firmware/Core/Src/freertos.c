@@ -31,6 +31,10 @@
 #include "lcd_utils.h"        // the function Display_Color_From_Class
 #include <stdint.h>
 #include "cmsis_os.h"
+#include "camera.h"
+#include "string.h"
+
+#define LCD_FRAMEBUFFER_ADDR  ((uint32_t)0xC0000000)
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -186,6 +190,31 @@ void StartHGRTask(void *argument)
         Display_Color_From_Class(predicted_class + 1);   // change to just predicted_class if you prefer 0-9
 
         osDelay(1000);  // 1 second so you can see the color change
+    }
+}
+void StartCameraTask(void const * argument)
+{
+    // Small delay to ensure everything is initialized
+    osDelay(500);
+
+    while(1)
+    {
+        // 1. Capture image
+        Camera_Capture();
+
+        while (!Camera_IsFrameReady());
+
+        // 2. IMPORTANT: Cache fix (if cache enabled later)
+        SCB_InvalidateDCache_by_Addr((uint32_t*)frame_buffer,
+                                    CAM_WIDTH * CAM_HEIGHT * 2);
+
+        // 3. Display on LCD
+        memcpy((uint16_t*)LCD_FRAMEBUFFER_ADDR,
+               frame_buffer,
+               CAM_WIDTH * CAM_HEIGHT * 2);
+
+        // 4. Wait (so you see stable image)
+        osDelay(1000);
     }
 }
 /* USER CODE END Application */

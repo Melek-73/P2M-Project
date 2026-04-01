@@ -235,4 +235,11 @@ void DMA2D_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
+extern DCMI_HandleTypeDef hdcmi;
+
+void DCMI_IRQHandler(void)
+{
+  HAL_DCMI_IRQHandler(&hdcmi);
+}
+
 /* USER CODE END 1 */
