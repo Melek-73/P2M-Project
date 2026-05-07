@@ -1,164 +1,261 @@
-# P2M – Embedded AI-Based Gesture-Controlled Industrial HMI System
+# P2M – Edge AI Gesture-Controlled Industrial HMI System
 
-## 1. Problem Description
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%204%20%7C%20STM32F747I-lightgrey)
+![AI](https://img.shields.io/badge/AI-Edge%20Impulse%20%7C%20FOMO-brightgreen)
+![Status](https://img.shields.io/badge/status-Active-success)
 
-Modern manufacturing environments rely heavily on **Human-Machine Interfaces (HMIs)** to monitor and control industrial processes such as temperature, motor speed, and machine status. Traditional HMIs (buttons, touchscreens) present several limitations:
-
-- Physical contact is required → not ideal in harsh or contaminated environments
-- Operators may wear gloves → touch interaction becomes unreliable
-- Repetitive manual interaction → reduces efficiency and ergonomics
-- Limited flexibility in interaction design
-
-There is a need for a **contactless**, **intuitive**, and **intelligent** interface that improves operator interaction while maintaining reliability in industrial conditions.
-
-## 2. Proposed Solution
-
-This project introduces a **gesture-controlled embedded HMI system** based on:
-
-- An **embedded AI model** running on a microcontroller
-- A **camera** capturing user hand gestures
-- A **real-time interface** displayed on an LCD
-- Gesture-based navigation and control of machine parameters
-
-The system enables operators to interact with industrial dashboards using simple hand gestures such as:
-
-- 👉 **Swipe right** → Next screen
-- 👈 **Swipe left** → Previous screen
-- ✊ **Fist** → Stop machine
-- 🖐 **Palm** → Open menu
-
-This creates a **touchless**, **intuitive** control system suitable for industrial environments.
-
-## 3. Use Case: Smart Manufacturing Dashboard
-
-**Scenario**  
-An operator supervises a production machine using an LCD dashboard displaying:
-
-- 🌡 Temperature
-- ⚙ Motor speed (RPM)
-- ✅ Machine status (Running / Stopped)
-
-Instead of using buttons or touch:
-
-- The operator performs gestures in front of the camera
-- The system recognizes the gesture using embedded AI
-- The interface reacts instantly (navigation or control action)
-
-## 4. System Architecture
-Camera → Preprocessing → AI Model → Decision Logic → LCD Interface
-### High-Level Architecture
-
-### Hardware Components
-
-- **Microcontroller**: STM32F746NG  
-  - Cortex-M7 core  
-  - Executes AI inference and system logic
-- **Camera Sensor**: OV5640  
-  - Captures real-time images of user gestures
-- **Display**: TFT LCD (LTDC interface)  
-  - Displays industrial dashboard and UI
-- **Memory**: Internal SRAM / External SDRAM  
-  - Stores frame buffers and AI data
-
-### Software Components
-
-- **Embedded AI Runtime**: X-CUBE-AI
-- **RTOS**: FreeRTOS (task scheduling)
-- **HAL Drivers**: STM32 HAL (DCMI, LTDC, DMA)
-- **Application Layer**: Gesture recognition + UI logic
-
-## 5. System Workflow
-
-Step-by-step execution:
-
-1. **Image Acquisition**  
-   Camera captures a frame via DCMI + DMA  
-   Image stored in frame buffer
-
-2. **Preprocessing**  
-   Resize image (e.g., 320×240 → 64×64)  
-   Convert format (RGB → grayscale or normalized RGB)  
-   Normalize pixel values (e.g., -128 to 127)
-
-3. **AI Inference**  
-   Processed image is fed into the neural network  
-   Model outputs probabilities for gesture classes
-
-4. **Decision Logic**  
-   Highest probability → predicted gesture  
-   Gesture mapped to system action
-
-5. **UI Update**  
-   LCD interface updated accordingly  
-   Example:  
-   - Gesture = “Fist” → Machine status = STOPPED  
-   - Gesture = “Swipe Right” → Next dashboard page
-
-## 6. User Interface (UI/UX Design)
-
-The LCD displays a professional industrial dashboard:
-
-### Interaction Model
-
-| Gesture     | Action          |
-|-------------|-----------------|
-| 🖐 Palm     | Open menu       |
-| 👉 Swipe Right | Next screen  |
-| 👈 Swipe Left  | Previous screen |
-| ✊ Fist      | Stop machine    |
-
-## 7. AI Model Description
-
-- **Type**: Image classification model
-- **Input**: 64×64 image (grayscale or RGB)
-- **Output**: Gesture class (e.g., 10 classes)
-
-### Processing Pipeline
-Image → Quantization → Tensor → Inference → Output Vector
-**Output Example**
-[0.01, 0.02, 0.85, 0.03, ...]
-→ Predicted class = 2
-
-
-## 8. Technical Concepts Used
-
-- **Embedded AI** — Running neural networks directly on microcontrollers using optimized inference engines
-- **Quantization** — Reducing model precision (float → int8) to decrease memory usage and increase speed
-- **DMA** (Direct Memory Access) — Transfers camera data without CPU intervention
-- **DCMI** (Digital Camera Interface) — Hardware peripheral for image capture
-- **Cache Coherency** (STM32F7) — Managing CPU cache when using DMA
-- **Real-Time Systems** (FreeRTOS) — Deterministic execution and task scheduling
-
-## 9. System Constraints & Challenges
-
-- Limited memory (embedded environment)
-- Real-time processing requirements
-- Camera noise vs model accuracy
-- Cache and DMA synchronization issues
-- Optimization of inference time
-
-## 10. Results (Current Progress)
-
-- ✅ AI model deployed and running on STM32
-- ✅ Correct classification on test images
-- ✅ LCD visualization working (color mapping)
-- 🔄 Camera integration in progress
-
-## 11. Future Improvements
-
-- Real-time camera-based inference
-- Advanced UI/UX (multi-screen navigation)
-- Finger tracking (cursor-like interaction)
-- Model optimization (latency reduction)
-- Integration with real industrial sensors
-
-## 12. Conclusion
-
-This project demonstrates the feasibility of combining **embedded systems**, **artificial intelligence**, and **human-centered interaction** to build a next-generation industrial HMI.
-
-The system transforms traditional machine control into a **contactless**, **intelligent**, and **interactive** experience, opening the door to smarter and safer manufacturing environments.
+> A real-time Edge AI-based touchless Human-Machine Interface (HMI) for industrial environments — control dashboards with hand gestures, no physical contact required.
 
 ---
 
-**👨‍💻 Author**  
-Melek Fourati
+## 📌 Table of Contents
+
+- [Overview](#overview)
+- [Problem Statement](#problem-statement)
+- [Proposed Solution](#proposed-solution)
+- [System Architecture](#system-architecture)
+- [Hardware Components](#hardware-components)
+- [AI Model](#ai-model)
+- [Dataset](#dataset)
+- [System Workflow](#system-workflow)
+- [HMI & UI Design](#hmi--ui-design)
+- [Communication Architecture](#communication-architecture)
+- [Performance & Optimization](#performance--optimization)
+- [Technologies & Tools](#technologies--tools)
+- [Current Status](#current-status)
+- [Future Improvements](#future-improvements)
+- [Author](#author)
+
+---
+
+## Overview
+
+**P2M** is a gesture-controlled embedded HMI system that allows operators to interact with an industrial dashboard using hand gestures instead of physical buttons or touchscreens.
+
+The project combines:
+
+- 🤖 **Computer Vision**
+- 🔌 **Embedded Systems**
+- 🧠 **Edge AI**
+- 📡 **Real-Time Communication**
+- 🖥️ **Graphical User Interfaces**
+
+Built on a distributed architecture using a **Raspberry Pi 4** for AI inference and an **STM32F747I Discovery Kit** for HMI rendering.
+
+---
+
+## 🎯 Problem Statement
+
+Traditional industrial HMIs rely on physical interaction (buttons, touchscreens), introducing several limitations:
+
+- Physical contact in harsh or contaminated environments
+- Reduced usability when operators wear gloves
+- Limited interaction flexibility
+- Hygiene and maintenance concerns
+- Poor ergonomics in repetitive interaction scenarios
+
+A contactless, intelligent interaction system is needed to improve usability, flexibility, and operator experience in industrial settings.
+
+---
+
+## 🚀 Proposed Solution
+
+This project introduces a **gesture-controlled embedded HMI system** based on real-time computer vision and Edge AI. The system detects hand gestures via camera and translates them into interaction events:
+
+- 🖱️ Cursor movement
+- 🧭 Navigation
+- 🖱️ Click actions
+
+### Example Use Case
+
+An operator interacts with an industrial dashboard without ever touching the screen:
+
+| Gesture | Action          |
+| ------- | --------------- |
+| 🖐 Palm | Cursor movement |
+| ✊ Fist | Click / Select  |
+
+Example dashboard elements:
+
+- 🌡 Temperature monitoring
+- ⚙ Motor speed control
+- ✅ Machine status visualization
+- 📊 Industrial process navigation
+
+---
+
+## 🏗️ System Architecture
+
+```
+Pi NoIR Camera V2
+        ↓
+Raspberry Pi 4
+(FOMO Edge AI Inference)
+        ↓ UART
+STM32F747I Discovery Kit
+(TouchGFX HMI + LTDC Rendering)
+        ↓
+Industrial Dashboard Display
+```
+
+---
+
+## 🔧 Hardware Components
+
+| Component                | Purpose                       |
+| ------------------------ | ----------------------------- |
+| Raspberry Pi 4 Model B   | Edge AI inference             |
+| Pi NoIR Camera V2        | Real-time image acquisition   |
+| STM32F747I Discovery Kit | HMI control and rendering     |
+| LTDC TFT Display         | Dashboard visualization       |
+| UART Interface           | Communication between systems |
+
+---
+
+## 🧠 AI Model
+
+### Model Type
+
+- **FOMO** (Faster Objects, More Objects) — a lightweight CNN-based object detection architecture built on **MobileNetV2**
+
+### Training Platform
+
+- [Edge Impulse Studio](https://edgeimpulse.com)
+
+### Model Capabilities
+
+- Hand detection
+- Gesture classification
+- Centroid extraction (x, y)
+
+### Gesture Classes
+
+| Class      | Description                 |
+| ---------- | --------------------------- |
+| Palm       | Open hand — cursor movement |
+| Fist       | Closed hand — click/select  |
+| Background | No hand detected            |
+
+---
+
+## 📂 Dataset
+
+A custom dataset was created and manually annotated using **Edge Impulse**.
+
+| Property        | Details  |
+| --------------- | -------- |
+| Training images | ~500     |
+| Testing images  | ~80      |
+| Class balance   | Balanced |
+
+**Variations included:**
+
+- Different hand positions
+- Multiple lighting conditions
+- Different scales and distances
+- Various backgrounds
+- Partial hand visibility
+
+---
+
+## ⚙️ System Workflow
+
+```
+1. Image Acquisition    →  Camera captures real-time frames
+2. AI Inference         →  Raspberry Pi runs FOMO model on each frame
+3. Feature Extraction   →  Gesture class + hand centroid (x, y) extracted
+4. Signal Processing    →  EMA smoothing + gesture debouncing
+5. Communication        →  Data sent via UART
+                           Format: <X:120,Y:85,G:PALM>
+6. Embedded Processing  →  STM32 parses data, maps to screen, triggers events
+7. UI Rendering         →  TouchGFX renders dashboard via LTDC
+```
+
+---
+
+## 🖥️ HMI & UI Design
+
+The graphical interface was developed using the **TouchGFX** embedded GUI framework.
+
+**Features:**
+
+- Real-time cursor rendering
+- Interactive dashboard navigation
+- Embedded graphical components
+- Industrial-style UI design
+
+---
+
+## 🔄 Communication Architecture
+
+**Protocol:** UART
+
+| Parameter  | Value                      |
+| ---------- | -------------------------- |
+| Connection | Raspberry Pi TX → STM32 RX |
+| Baudrate   | 115200                     |
+
+**Data Transmitted:**
+
+- X coordinate
+- Y coordinate
+- Gesture state
+
+**Packet format:**
+
+```
+<X:120,Y:85,G:PALM>
+```
+
+---
+
+## ⚡ Performance & Optimization
+
+### Latency Breakdown
+
+| Block              | Latency   |
+| ------------------ | --------- |
+| AI Inference       | ~30–60 ms |
+| UART Communication | ~1–2 ms   |
+| STM32 Rendering    | < 5 ms    |
+
+### Optimization Techniques
+
+- INT8 Quantization
+- Lightweight FOMO architecture
+- Reduced input resolution
+- Efficient UART packet structure
+- Coordinate smoothing (EMA)
+
+---
+
+## 🧰 Technologies & Tools
+
+### Software
+
+| Tool                | Purpose                     |
+| ------------------- | --------------------------- |
+| Python              | Raspberry Pi scripting      |
+| Edge Impulse Studio | Model training & deployment |
+| TensorFlow Lite     | On-device inference         |
+| STM32CubeIDE        | Firmware development        |
+| STM32CubeMX         | Peripheral configuration    |
+| TouchGFX            | Embedded GUI design         |
+| FreeRTOS            | Real-time task management   |
+| VNC Viewer          | Remote Pi access            |
+| Minicom             | UART text interface         |
+
+### Concepts
+
+Edge AI · Computer Vision · CNNs · Embedded Systems · Real-Time Systems · UART Communication · LTDC Graphics · Signal Processing
+
+---
+
+## 👨‍💻 Author
+
+**Melek Fourati**
+
+---
+
+> _This project demonstrates how Edge AI, embedded systems, and computer vision can be combined to build a modern contactless industrial HMI — transforming traditional interaction into a real-time intelligent experience._
