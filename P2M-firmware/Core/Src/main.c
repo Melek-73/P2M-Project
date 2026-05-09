@@ -138,8 +138,11 @@ static void MX_TIM8_Init(void);
 static void MX_TIM12_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART6_UART_Init(void);
-void StartDefaultTask(void const * argument);
 
+void StartDefaultTask(void const * argument);
+void SetScreenColor(uint16_t color);
+void LCD_Fill(uint16_t color);
+void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -173,27 +176,33 @@ int main(void)
   /* USER CODE END Init */
 
   /* Configure the system clock */
-  //SystemClock_Config();
+  SystemClock_Config();
 
   /* Configure the peripherals common clocks */
-  //PeriphCommonClock_Config();
+  PeriphCommonClock_Config();
 
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  /*
+
   MX_GPIO_Init();
+  /*
   MX_ADC3_Init();
   MX_CRC_Init();
   MX_DCMI_Init();
   MX_DMA2D_Init();
   MX_ETH_Init();
+  */
   MX_FMC_Init();
+  SDRAM_Initialization_Sequence(&hsdram1);
+  /*
   MX_I2C1_Init();
   MX_I2C3_Init();
+  */
   MX_LTDC_Init();
+  /*
   MX_QUADSPI_Init();
   MX_RTC_Init();
   MX_SAI2_Init();
@@ -249,49 +258,79 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   /* USER CODE BEGIN WHILE */
 
-  HAL_UART_Receive_IT(&huart6, rx_buffer, 1);   // Start UART receive interrupt
+  /* USER CODE BEGIN 2 */
+  HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
+
+  SetScreenColor(0x001F);  // Start with Yellow
+  HAL_UART_Transmit(&huart6, (uint8_t*)"STM32 Ready - Send 0=Red, 1=Green\r\n", 38, HAL_MAX_DELAY);
 
   while (1)
   {
-    /* Send test message every second */
-    char msg[] = "Hello world from STM32\r\n";
-    HAL_UART_Transmit(&huart6, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart6, (uint8_t*)"Hello all all from STM32\r\n", 18, HAL_MAX_DELAY);
 
-    /* === Check data received from Raspberry Pi === */
-    /* === Check data received from Raspberry Pi === */
     if (rx_ready == 1)
     {
       rx_ready = 0;
-
       char received = (char)rx_buffer[0];
 
-      // Debug
       char debug[60];
-      sprintf(debug, "Received: '%c' (0x%02X)\r\n", received, received);
+      sprintf(debug, "Received: %c\r\n", received);
       HAL_UART_Transmit(&huart6, (uint8_t*)debug, strlen(debug), HAL_MAX_DELAY);
 
       if (received == '0')
       {
-        hltdc.LayerCfg[0].Backcolor.Red   = 255;
-        hltdc.LayerCfg[0].Backcolor.Green = 0;
-        hltdc.LayerCfg[0].Backcolor.Blue  = 0;
-        HAL_LTDC_ConfigLayer(&hltdc, &hltdc.LayerCfg[0], 0);
+        SetScreenColor(0xF800);   // Red
         HAL_UART_Transmit(&huart6, (uint8_t*)"-> RED (Fist)\r\n", 15, HAL_MAX_DELAY);
       }
       else if (received == '1')
       {
-        hltdc.LayerCfg[0].Backcolor.Red   = 0;
-        hltdc.LayerCfg[0].Backcolor.Green = 255;
-        hltdc.LayerCfg[0].Backcolor.Blue  = 0;
-        HAL_LTDC_ConfigLayer(&hltdc, &hltdc.LayerCfg[0], 0);
+        SetScreenColor(0x07E0);   // Green
         HAL_UART_Transmit(&huart6, (uint8_t*)"-> GREEN (Palm)\r\n", 17, HAL_MAX_DELAY);
       }
 
-      // Restart UART receive for next character
       HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
     }
 
-    HAL_Delay(1000);   // 1 second delay
+    HAL_Delay(1000);
+
+
+
+
+  /*
+  HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
+
+  // Initial color
+  SetScreenColor(0xFFE0);   // Yellow at start
+  HAL_UART_Transmit(&huart6, (uint8_t*)"STM32 Started - Send 0 or 1\r\n", 30, HAL_MAX_DELAY);
+  while (1)
+  {
+	  // Send message every second
+	      HAL_UART_Transmit(&huart6, (uint8_t*)"Hello from STM32\r\n", 18, HAL_MAX_DELAY);
+
+	      // Check received data
+	      if (rx_ready == 1)
+	      {
+	        rx_ready = 0;
+	        char received = (char)rx_buffer[0];
+
+	        char debug[50];
+	        sprintf(debug, "Received: %c\r\n", received);
+	        HAL_UART_Transmit(&huart6, (uint8_t*)debug, strlen(debug), HAL_MAX_DELAY);
+
+	        if (received == '0')
+	          SetScreenColor(0xF800);   // Red
+	        else if (received == '1')
+	          SetScreenColor(0x07E0);   // Green
+
+	        HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
+	      }
+
+	      HAL_Delay(1000);
+
+	*/
+
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -320,6 +359,97 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
 }
 
+// Simple function to fill screen with solid color (RGB565)
+// Strong Solid Color Function
+/* USER CODE BEGIN 4 */
+
+// Simple and reliable way using LTDC Background Color
+// Simple function to fill screen with solid color (RGB565)
+
+
+
+
+void SetScreenColor(uint16_t color)
+{
+    uint16_t *fb = (uint16_t*)0xC0000000;
+
+    for(uint32_t i = 0; i < (480UL * 272UL); i++)
+    {
+        fb[i] = color;
+    }
+
+    //SCB_CleanDCache();
+
+    //HAL_LTDC_Reload(&hltdc, LTDC_RELOAD_IMMEDIATE);
+}
+
+#define LCD_WIDTH   480
+#define LCD_HEIGHT  272
+
+void LCD_Fill(uint16_t color)
+{
+    uint16_t *fb = (uint16_t*)0xC0000000;
+
+    for(int i = 0; i < LCD_WIDTH * LCD_HEIGHT; i++)
+    {
+        fb[i] = color;
+    }
+}
+
+#define SDRAM_MODEREG_BURST_LENGTH_1             0x0000
+#define SDRAM_MODEREG_BURST_TYPE_SEQUENTIAL      0x0000
+#define SDRAM_MODEREG_CAS_LATENCY_3              0x0030
+#define SDRAM_MODEREG_OPERATING_MODE_STANDARD    0x0000
+#define SDRAM_MODEREG_WRITEBURST_MODE_SINGLE     0x0200
+void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram)
+{
+    FMC_SDRAM_CommandTypeDef Command;
+    __IO uint32_t tmpmrd = 0;
+
+    /* Step 1: Configure a clock configuration enable command */
+    Command.CommandMode = FMC_SDRAM_CMD_CLK_ENABLE;
+    Command.CommandTarget = FMC_SDRAM_CMD_TARGET_BANK1;
+    Command.AutoRefreshNumber = 1;
+    Command.ModeRegisterDefinition = 0;
+
+    HAL_SDRAM_SendCommand(hsdram, &Command, HAL_MAX_DELAY);
+
+    HAL_Delay(1);
+
+    /* Step 2: Precharge all command */
+    Command.CommandMode = FMC_SDRAM_CMD_PALL;
+    Command.CommandTarget = FMC_SDRAM_CMD_TARGET_BANK1;
+    Command.AutoRefreshNumber = 1;
+    Command.ModeRegisterDefinition = 0;
+
+    HAL_SDRAM_SendCommand(hsdram, &Command, HAL_MAX_DELAY);
+
+    /* Step 3: Auto-refresh command */
+    Command.CommandMode = FMC_SDRAM_CMD_AUTOREFRESH_MODE;
+    Command.CommandTarget = FMC_SDRAM_CMD_TARGET_BANK1;
+    Command.AutoRefreshNumber = 8;
+    Command.ModeRegisterDefinition = 0;
+
+    HAL_SDRAM_SendCommand(hsdram, &Command, HAL_MAX_DELAY);
+
+    /* Step 4: Load Mode Register */
+    tmpmrd =
+          SDRAM_MODEREG_BURST_LENGTH_1
+        | SDRAM_MODEREG_BURST_TYPE_SEQUENTIAL
+        | SDRAM_MODEREG_CAS_LATENCY_3
+        | SDRAM_MODEREG_OPERATING_MODE_STANDARD
+        | SDRAM_MODEREG_WRITEBURST_MODE_SINGLE;
+
+    Command.CommandMode = FMC_SDRAM_CMD_LOAD_MODE;
+    Command.CommandTarget = FMC_SDRAM_CMD_TARGET_BANK1;
+    Command.AutoRefreshNumber = 1;
+    Command.ModeRegisterDefinition = tmpmrd;
+
+    HAL_SDRAM_SendCommand(hsdram, &Command, HAL_MAX_DELAY);
+
+    /* Step 5: Set refresh rate */
+    HAL_SDRAM_ProgramRefreshRate(hsdram, 683);
+}
 /* USER CODE END 4 */
 /* ===== USER CODE END 4 =====*/
 

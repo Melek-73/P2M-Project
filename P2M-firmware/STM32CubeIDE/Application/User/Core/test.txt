@@ -1,0 +1,155 @@
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MPU Configuration--------------------------------------------------------*/
+  //MPU_Config();
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+
+  MX_GPIO_Init();
+  /*
+  MX_ADC3_Init();
+  MX_CRC_Init();
+  MX_DCMI_Init();
+  MX_DMA2D_Init();
+  MX_ETH_Init();
+  MX_FMC_Init();
+  MX_I2C1_Init();
+  MX_I2C3_Init();
+  */
+  MX_LTDC_Init();
+  /*
+  MX_QUADSPI_Init();
+  MX_RTC_Init();
+  MX_SAI2_Init();
+  MX_SDMMC1_SD_Init();
+  MX_SPDIFRX_Init();
+  MX_SPI2_Init();
+  MX_TIM1_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
+  MX_TIM5_Init();
+  MX_TIM8_Init();
+  MX_TIM12_Init();
+  MX_USART1_UART_Init();
+  */
+  MX_USART6_UART_Init();
+  //MX_FATFS_Init();
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of defaultTask */
+  //osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 4096);
+  //defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* Start scheduler */
+  //osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  /* USER CODE BEGIN WHILE */
+  /* USER CODE BEGIN WHILE */
+
+  HAL_UART_Receive_IT(&huart6, rx_buffer, 1);   // Start UART receive interrupt
+
+  while (1)
+  {
+    /* Send test message every second */
+    char msg[] = "Hello all the world from STM32\r\n";
+    HAL_UART_Transmit(&huart6, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+    /* === Check data received from Raspberry Pi === */
+    /* === Check data received from Raspberry Pi === */
+    if (rx_ready == 1)
+    {
+      rx_ready = 0;
+
+      char received = (char)rx_buffer[0];
+
+      char debug[60];
+      sprintf(debug, "Received: '%c'\r\n", received);
+      HAL_UART_Transmit(&huart6, (uint8_t*)debug, strlen(debug), HAL_MAX_DELAY);
+
+      if (received == '0')        // RED - Fist
+      {
+        // Clear framebuffer + force background color
+        memset((uint8_t*)hltdc.LayerCfg[0].FBStartAdress, 0, 480*272*2); // Black first
+
+        hltdc.LayerCfg[0].Backcolor.Red   = 255;
+        hltdc.LayerCfg[0].Backcolor.Green = 0;
+        hltdc.LayerCfg[0].Backcolor.Blue  = 0;
+
+        HAL_LTDC_ConfigLayer(&hltdc, &hltdc.LayerCfg[0], 0);
+        HAL_LTDC_Reload(&hltdc, LTDC_RELOAD_IMMEDIATE);
+
+        HAL_UART_Transmit(&huart6, (uint8_t*)"-> RED (Fist)\r\n", 15, HAL_MAX_DELAY);
+      }
+      else if (received == '1')   // GREEN - Palm
+      {
+        memset((uint8_t*)hltdc.LayerCfg[0].FBStartAdress, 0, 480*272*2);
+
+        hltdc.LayerCfg[0].Backcolor.Red   = 0;
+        hltdc.LayerCfg[0].Backcolor.Green = 255;
+        hltdc.LayerCfg[0].Backcolor.Blue  = 0;
+
+        HAL_LTDC_ConfigLayer(&hltdc, &hltdc.LayerCfg[0], 0);
+        HAL_LTDC_Reload(&hltdc, LTDC_RELOAD_IMMEDIATE);
+
+        HAL_UART_Transmit(&huart6, (uint8_t*)"-> GREEN (Palm)\r\n", 17, HAL_MAX_DELAY);
+      }
+
+      HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
+    }
+
+    HAL_Delay(1000);   // 1 second delay
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
