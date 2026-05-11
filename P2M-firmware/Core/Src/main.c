@@ -28,15 +28,37 @@
 #include <stdio.h>     // Needed for sprintf
 /* USER CODE END Includes */
 
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+#define LCD_WIDTH   480
+#define LCD_HEIGHT  272
+
+#define CURSOR_RADIUS  5
+#define CURSOR_SIZE (CURSOR_RADIUS * 2)
+
+static inline int FX(int x);
+#define COLOR_BLACK      0x0000
+#define COLOR_WHITE      0xFFFF
+#define COLOR_RED        0xF800
+#define COLOR_GREEN      0x07E0
+#define COLOR_BLUE       0x001F
+#define COLOR_YELLOW     0xFFE0
+#define COLOR_DARKBLUE   0x0192
+#define COLOR_GRAY       0x8410
+#define COLOR_ORANGE     0xFD20
+#define COLOR_PINK       0xF81F
+#define COLOR_CYAN       0x07FF
+/* USER CODE END PD */
+
+
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+
+
 /* USER CODE END PTD */
 
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
 
-/* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
@@ -104,10 +126,46 @@ UART_HandleTypeDef huart6;
 SDRAM_HandleTypeDef hsdram1;
 
 osThreadId defaultTaskHandle;
+
+
+
+
 /* USER CODE BEGIN PV */
-uint8_t rx_buffer[256] = {0};
-char received_label[32] = {0};
-volatile uint8_t rx_ready = 0;
+uint8_t rx_buffer[256];
+volatile uint8_t rx_index = 0;
+volatile uint8_t packet_ready = 0;
+uint16_t cursor_backup[CURSOR_RADIUS * 2][CURSOR_RADIUS * 2];
+char uart_packet[256];
+uint8_t ui_initialized = 0;
+
+
+// Cursor
+int cursor_x = 240;
+int cursor_y = 136;
+
+int prev_cursor_x = 240;
+int prev_cursor_y = 136;
+
+// Gesture state
+uint8_t current_gesture = 1;
+uint8_t previous_gesture = 1;
+
+// UI state
+uint16_t background_color = COLOR_BLACK;
+
+// =========================
+// LIGHT TOGGLE SWITCH AREA
+// =========================
+
+#define SWITCH_X      250
+#define SWITCH_Y      145
+#define SWITCH_W      60
+#define SWITCH_H      28
+
+uint8_t light_on = 0;
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -141,8 +199,26 @@ static void MX_USART6_UART_Init(void);
 
 void StartDefaultTask(void const * argument);
 void SetScreenColor(uint16_t color);
-void LCD_Fill(uint16_t color);
+//void LCD_Fill(uint16_t color);
 void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram);
+
+void DrawPixel(int x, int y, uint16_t color);
+void FillRect(int x, int y, int w, int h, uint16_t color);
+void DrawCursor(int x, int y, uint16_t color);
+void ProcessPacket(char *packet);
+
+void DrawCircle(int cx, int cy, int r, uint16_t color);
+
+void DrawUI(void);
+
+void DrawLightSwitch(void);
+
+void SaveBackgroundUnderCursor(int x, int y);
+
+void RestoreBackgroundUnderCursor(int x, int y);
+void DrawChar5x7(int x, int y, char c, uint16_t color);
+void DrawText(int x, int y, char *text, uint16_t color);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -159,184 +235,49 @@ void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram);
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MPU Configuration--------------------------------------------------------*/
-  //MPU_Config();
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
 
   /* Configure the peripherals common clocks */
   PeriphCommonClock_Config();
 
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-
   MX_GPIO_Init();
-  /*
-  MX_ADC3_Init();
-  MX_CRC_Init();
-  MX_DCMI_Init();
-  MX_DMA2D_Init();
-  MX_ETH_Init();
-  */
+
   MX_FMC_Init();
   SDRAM_Initialization_Sequence(&hsdram1);
-  /*
-  MX_I2C1_Init();
-  MX_I2C3_Init();
-  */
   MX_LTDC_Init();
-  /*
-  MX_QUADSPI_Init();
-  MX_RTC_Init();
-  MX_SAI2_Init();
-  MX_SDMMC1_SD_Init();
-  MX_SPDIFRX_Init();
-  MX_SPI2_Init();
-  MX_TIM1_Init();
-  MX_TIM2_Init();
-  MX_TIM3_Init();
-  MX_TIM5_Init();
-  MX_TIM8_Init();
-  MX_TIM12_Init();
-  MX_USART1_UART_Init();
-  */
+
   MX_USART6_UART_Init();
-  //MX_FATFS_Init();
-  /* USER CODE BEGIN 2 */
 
-  /* USER CODE END 2 */
-
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
-
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
-
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  //osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 4096);
-  //defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* Start scheduler */
-  //osKernelStart();
-
-  /* We should never get here as control is now taken by the scheduler */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  /* USER CODE BEGIN WHILE */
-  /* USER CODE BEGIN WHILE */
 
   /* USER CODE BEGIN 2 */
   HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
 
-  SetScreenColor(0x001F);  // Start with Yellow
-  HAL_UART_Transmit(&huart6, (uint8_t*)"STM32 Ready - Send 0=Red, 1=Green\r\n", 38, HAL_MAX_DELAY);
+  // Initial UI
+  DrawUI();
+  ui_initialized = 1;
+  SaveBackgroundUnderCursor(cursor_x, cursor_y);
+
+  DrawCircle(cursor_x, cursor_y, CURSOR_RADIUS, COLOR_WHITE);
+
+  HAL_UART_Transmit(
+      &huart6,
+      (uint8_t*)"STM32 Gesture UI Started\r\n",
+      27,
+      HAL_MAX_DELAY
+  );
 
   while (1)
   {
-    HAL_UART_Transmit(&huart6, (uint8_t*)"Hello all all from STM32\r\n", 18, HAL_MAX_DELAY);
-
-    if (rx_ready == 1)
-    {
-      rx_ready = 0;
-      char received = (char)rx_buffer[0];
-
-      char debug[60];
-      sprintf(debug, "Received: %c\r\n", received);
-      HAL_UART_Transmit(&huart6, (uint8_t*)debug, strlen(debug), HAL_MAX_DELAY);
-
-      if (received == '0')
+      if(packet_ready)
       {
-        SetScreenColor(0xF800);   // Red
-        HAL_UART_Transmit(&huart6, (uint8_t*)"-> RED (Fist)\r\n", 15, HAL_MAX_DELAY);
+          packet_ready = 0;
+
+          ProcessPacket(uart_packet);
       }
-      else if (received == '1')
-      {
-        SetScreenColor(0x07E0);   // Green
-        HAL_UART_Transmit(&huart6, (uint8_t*)"-> GREEN (Palm)\r\n", 17, HAL_MAX_DELAY);
-      }
-
-      HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
-    }
-
-    HAL_Delay(1000);
-
-
-
-
-  /*
-  HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
-
-  // Initial color
-  SetScreenColor(0xFFE0);   // Yellow at start
-  HAL_UART_Transmit(&huart6, (uint8_t*)"STM32 Started - Send 0 or 1\r\n", 30, HAL_MAX_DELAY);
-  while (1)
-  {
-	  // Send message every second
-	      HAL_UART_Transmit(&huart6, (uint8_t*)"Hello from STM32\r\n", 18, HAL_MAX_DELAY);
-
-	      // Check received data
-	      if (rx_ready == 1)
-	      {
-	        rx_ready = 0;
-	        char received = (char)rx_buffer[0];
-
-	        char debug[50];
-	        sprintf(debug, "Received: %c\r\n", received);
-	        HAL_UART_Transmit(&huart6, (uint8_t*)debug, strlen(debug), HAL_MAX_DELAY);
-
-	        if (received == '0')
-	          SetScreenColor(0xF800);   // Red
-	        else if (received == '1')
-	          SetScreenColor(0x07E0);   // Green
-
-	        HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
-	      }
-
-	      HAL_Delay(1000);
-
-	*/
-
-
-
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
   }
-  /* USER CODE END 3 */
-  /* USER CODE END 3 */
+
+      HAL_Delay(10);
 }
 
 /* ==== USER CODE BEGIN 4 ==== */
@@ -345,18 +286,356 @@ int main(void)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  if (huart->Instance == USART6)
-  {
-    // Ignore newline and carriage return
-    if (rx_buffer[0] == '\n' || rx_buffer[0] == '\r')
+    if(huart->Instance == USART6)
     {
-      HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
-      return;
+        uint8_t c = rx_buffer[0];
+
+        if(c == '\n')
+        {
+            uart_packet[rx_index] = '\0';
+
+            packet_ready = 1;
+
+            rx_index = 0;
+        }
+        else
+        {
+            if(rx_index < sizeof(uart_packet) - 1)
+            {
+                uart_packet[rx_index++] = c;
+            }
+        }
+
+        HAL_UART_Receive_IT(&huart6, rx_buffer, 1);
+    }
+}
+
+void DrawPixel(int x, int y, uint16_t color)
+{
+    if(x < 0 || x >= LCD_WIDTH) return;
+    if(y < 0 || y >= LCD_HEIGHT) return;
+
+    uint16_t *fb = (uint16_t*)0xC0000000;
+
+    fb[y * LCD_WIDTH + x] = color;
+}
+void FillRect(int x, int y, int w, int h, uint16_t color)
+{
+    for(int j = y; j < y + h; j++)
+    {
+        for(int i = x; i < x + w; i++)
+        {
+            DrawPixel(i, j, color);
+        }
+    }
+}
+
+void DrawBackground(void)
+{
+    FillRect(0, 0, LCD_WIDTH, LCD_HEIGHT, background_color);
+}
+
+static inline int FX(int x)
+{
+    return (LCD_WIDTH - 1) - x;
+}
+
+
+void ProcessPacket(char *packet)
+{
+    int x, y, gesture;
+
+    if(sscanf(packet, "%d,%d,%d", &x, &y, &gesture) != 3)
+    {
+        return;
     }
 
-    rx_ready = 1;
-    // Do not restart here, we restart after processing
-  }
+    // =========================
+    // Scale coordinates
+    // FOMO: 96x96
+    // LCD : 480x272
+    // =========================
+
+    x = (x * LCD_WIDTH) / 96;
+    y = (y * LCD_HEIGHT) / 96;
+
+    // 1. restore old cursor area FIRST
+    RestoreBackgroundUnderCursor(prev_cursor_x, prev_cursor_y);
+
+    // =========================
+    // Smooth filtering
+    // =========================
+
+    cursor_x = (cursor_x * 7 + x) / 8;
+    cursor_y = (cursor_y * 7 + y) / 8;
+
+    // =========================
+    // Erase old cursor
+    // =========================
+
+    // Save new background
+    SaveBackgroundUnderCursor(cursor_x, cursor_y);
+
+    // =========================
+    // Draw new cursor
+    // =========================
+
+    DrawCircle(cursor_x, cursor_y, CURSOR_RADIUS, COLOR_WHITE);
+
+    // update previous
+    prev_cursor_x = cursor_x;
+    prev_cursor_y = cursor_y;
+
+    // =========================
+    // Gesture logic
+    // =========================
+
+    previous_gesture = current_gesture;
+    current_gesture = gesture;
+
+    // =========================
+    // CLICK DETECTION
+    // palm -> fist
+    // =========================
+
+    if(previous_gesture == 1 && current_gesture == 0)
+    {
+        if(cursor_x >= SWITCH_X &&
+           cursor_x <= SWITCH_X + SWITCH_W &&
+           cursor_y >= SWITCH_Y &&
+           cursor_y <= SWITCH_Y + SWITCH_H)
+        {
+            light_on = !light_on;
+
+            DrawLightSwitch();
+
+            SaveBackgroundUnderCursor(cursor_x, cursor_y);
+
+            DrawCircle(
+                cursor_x,
+                cursor_y,
+                CURSOR_RADIUS,
+                COLOR_WHITE
+            );
+        }
+    }
+}
+
+
+
+void SaveBackgroundUnderCursor(int x, int y)
+{
+    uint16_t *fb = (uint16_t*)0xC0000000;
+
+    for(int j = -CURSOR_RADIUS; j <= CURSOR_RADIUS; j++)
+    {
+        for(int i = -CURSOR_RADIUS; i <= CURSOR_RADIUS; i++)
+        {
+            if(i*i + j*j <= CURSOR_RADIUS*CURSOR_RADIUS)
+            {
+                int px = x + i;
+                int py = y + j;
+
+                if(px >= 0 && px < LCD_WIDTH &&
+                   py >= 0 && py < LCD_HEIGHT)
+                {
+                    cursor_backup[j + CURSOR_RADIUS][i + CURSOR_RADIUS] =
+                        fb[py * LCD_WIDTH + px];
+                }
+            }
+        }
+    }
+}
+void RestoreBackgroundUnderCursor(int x, int y)
+{
+    uint16_t *fb = (uint16_t*)0xC0000000;
+
+    for(int j = -CURSOR_RADIUS; j <= CURSOR_RADIUS; j++)
+    {
+        for(int i = -CURSOR_RADIUS; i <= CURSOR_RADIUS; i++)
+        {
+            if(i*i + j*j <= CURSOR_RADIUS*CURSOR_RADIUS)
+            {
+                int px = x + i;
+                int py = y + j;
+
+                if(px >= 0 && px < LCD_WIDTH &&
+                   py >= 0 && py < LCD_HEIGHT)
+                {
+                    fb[py * LCD_WIDTH + px] =
+                        cursor_backup[j + CURSOR_RADIUS][i + CURSOR_RADIUS];
+                }
+            }
+        }
+    }
+}
+void DrawLightSwitch(void)
+{
+    // Switch background
+    FillRect(
+        SWITCH_X,
+        SWITCH_Y,
+        SWITCH_W,
+        SWITCH_H,
+        COLOR_GRAY
+    );
+
+    if(light_on)
+    {
+        // Green circle ON
+        DrawCircle(
+            SWITCH_X + SWITCH_W - 14,
+            SWITCH_Y + 14,
+            10,
+            COLOR_GREEN
+        );
+    }
+    else
+    {
+        // Red circle OFF
+        DrawCircle(
+            SWITCH_X + 14,
+            SWITCH_Y + 14,
+            10,
+            COLOR_RED
+        );
+    }
+}
+void DrawUI(void)
+{
+    // =========================
+    // GLOBAL BACKGROUND (MAIN AREA BASE)
+    // =========================
+    SetScreenColor(COLOR_DARKBLUE);
+
+    // =========================================================
+    // TOP BAR
+    // | SYSTEM READY / UART | STATUS INFO |
+    // =========================================================
+
+    FillRect(0, 0, 240, 30, COLOR_GRAY);
+    FillRect(240, 0, 240, 30, COLOR_GRAY);
+
+    // vertical separator
+    FillRect(239, 0, 2, 30, COLOR_BLACK);
+
+    // =========================================================
+    // MAIN AREA (DARK BLUE)
+    // | LEFT EMPTY        | RIGHT EMPTY   |
+    // | BLACK DIVIDER LINE|
+    // =========================================================
+
+    FillRect(0, 30, 240, 192, COLOR_DARKBLUE);
+    FillRect(240, 30, 240, 192, COLOR_DARKBLUE);
+
+    // center vertical divider (black line)
+    FillRect(239, 30, 2, 192, COLOR_BLACK);
+
+    // optional horizontal baseline separator (subtle UI structure)
+    FillRect(0, 30, 480, 1, COLOR_BLACK);
+
+    // =========================================================
+    // BOTTOM AREA (NAVIGATION BAR)
+    // [ BLUE HOME | GREEN DEVICE | ORANGE LIGHT | PINK SETTINGS ]
+    // =========================================================
+
+    FillRect(0, 224, 120, 48, COLOR_BLUE);
+    FillRect(120, 224, 120, 48, COLOR_GREEN);
+    FillRect(240, 224, 120, 48, COLOR_ORANGE);
+    FillRect(360, 224, 120, 48, COLOR_PINK);
+
+    // separators between buttons
+    FillRect(120, 224, 2, 48, COLOR_BLACK);
+    FillRect(240, 224, 2, 48, COLOR_BLACK);
+    FillRect(360, 224, 2, 48, COLOR_BLACK);
+
+    // =========================
+    // SWITCH (ONLY DYNAMIC ELEMENT)
+    // =========================
+    DrawLightSwitch();
+}
+void DrawCircle(int cx, int cy, int r, uint16_t color)
+{
+    for(int y = -r; y <= r; y++)
+    {
+        for(int x = -r; x <= r; x++)
+        {
+            if(x*x + y*y <= r*r)
+            {
+                int px = cx + x;
+                int py = cy + y;
+
+                if(px >= 0 && px < LCD_WIDTH &&
+                   py >= 0 && py < LCD_HEIGHT)
+                {
+                    DrawPixel(px, py, color);
+                }
+            }
+        }
+    }
+}
+void DrawChar5x7(int x, int y, char c, uint16_t color)
+{
+    // SIMPLE DEBUG FONT (ONLY A FEW LETTERS)
+
+    if(c == 'H')
+    {
+        FillRect(x, y, 1, 7, color);
+        FillRect(x+4, y, 1, 7, color);
+        FillRect(x, y+3, 5, 1, color);
+    }
+    else if(c == 'O')
+    {
+        FillRect(x, y, 5, 1, color);
+        FillRect(x, y+6, 5, 1, color);
+        FillRect(x, y, 1, 7, color);
+        FillRect(x+4, y, 1, 7, color);
+    }
+    else if(c == 'N')
+    {
+        FillRect(x, y, 1, 7, color);
+        FillRect(x+4, y, 1, 7, color);
+        FillRect(x+1, y+1, 1, 1, color);
+        FillRect(x+2, y+2, 1, 1, color);
+        FillRect(x+3, y+3, 1, 1, color);
+    }
+    else if(c == 'F')
+    {
+        FillRect(x, y, 1, 7, color);
+        FillRect(x, y, 4, 1, color);
+        FillRect(x, y+3, 3, 1, color);
+    }
+    else if(c == 'E')
+    {
+        FillRect(x, y, 1, 7, color);
+        FillRect(x, y, 4, 1, color);
+        FillRect(x, y+3, 3, 1, color);
+        FillRect(x, y+6, 4, 1, color);
+    }
+    else if(c == 'L')
+    {
+        FillRect(x, y, 1, 7, color);
+        FillRect(x, y+6, 5, 1, color);
+    }
+    else if(c == 'A')
+    {
+        FillRect(x+2, y, 1, 7, color);
+        FillRect(x, y+2, 5, 1, color);
+        FillRect(x, y, 5, 1, color);
+    }
+    else if(c == ' ')
+    {
+        // space
+    }
+}
+void DrawText(int x, int y, char *text, uint16_t color)
+{
+    while(*text)
+    {
+        DrawChar5x7(x, y, *text, color);
+        x += 6;
+        text++;
+    }
 }
 
 // Simple function to fill screen with solid color (RGB565)
@@ -383,18 +662,6 @@ void SetScreenColor(uint16_t color)
     //HAL_LTDC_Reload(&hltdc, LTDC_RELOAD_IMMEDIATE);
 }
 
-#define LCD_WIDTH   480
-#define LCD_HEIGHT  272
-
-void LCD_Fill(uint16_t color)
-{
-    uint16_t *fb = (uint16_t*)0xC0000000;
-
-    for(int i = 0; i < LCD_WIDTH * LCD_HEIGHT; i++)
-    {
-        fb[i] = color;
-    }
-}
 
 #define SDRAM_MODEREG_BURST_LENGTH_1             0x0000
 #define SDRAM_MODEREG_BURST_TYPE_SEQUENTIAL      0x0000
@@ -1852,47 +2119,8 @@ static void MX_GPIO_Init(void)
   */
 /* USER CODE END Header_StartDefaultTask */
 // ===== StartDefaultTask modified =====
-void StartDefaultTask(void const * argument)
-{
-  /* init code for USB_HOST */
-  MX_USB_HOST_Init();
 
-  /* USER CODE BEGIN 5 */
-  HAL_UART_Receive_IT(&huart6, rx_buffer, 1);   // ← Enable interrupt receive
 
-  /* Infinite loop */
-  for(;;)
-  {
-    // === Send test message every second ===
-    char msg[] = "Hello from STM32\r\n";
-    HAL_UART_Transmit(&huart6, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-    // === Receive handling ===
-    if (rx_ready == 1)
-    {
-      rx_ready = 0;
-
-      if (strstr((char*)rx_buffer, "fist") != NULL)
-      {
-        hltdc.LayerCfg[0].Backcolor.Red   = 255;
-        hltdc.LayerCfg[0].Backcolor.Green = 0;
-        hltdc.LayerCfg[0].Backcolor.Blue  = 0;
-      }
-      else if (strstr((char*)rx_buffer, "palm") != NULL)
-      {
-        hltdc.LayerCfg[0].Backcolor.Red   = 0;
-        hltdc.LayerCfg[0].Backcolor.Green = 255;
-        hltdc.LayerCfg[0].Backcolor.Blue  = 0;
-      }
-
-      HAL_LTDC_ConfigLayer(&hltdc, &hltdc.LayerCfg[0], 0);
-      memset(rx_buffer, 0, sizeof(rx_buffer));
-    }
-
-    osDelay(1000);   // 1 second
-  }
-  /* USER CODE END 5 */
-}
  /* MPU Configuration */
 
 void MPU_Config(void)

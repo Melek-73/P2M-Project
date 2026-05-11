@@ -21,6 +21,8 @@
 - [System Workflow](#system-workflow)
 - [HMI & UI Design](#hmi--ui-design)
 - [Communication Architecture](#communication-architecture)
+- [Real-Time UART Protocol](#-real-time-uart-protocol-ai--stm32)
+- [Current Interaction Model](#-current-interaction-model-hmi-phase-2)
 - [Performance & Optimization](#performance--optimization)
 - [Technologies & Tools](#technologies--tools)
 - [Current Status](#current-status)
@@ -47,6 +49,10 @@ Built on a distributed architecture using a **Raspberry Pi 4** for AI inference 
 
 ## 🎯 Problem Statement
 
+<table>
+<tr>
+<td valign="top" width="55%">
+
 Traditional industrial HMIs rely on physical interaction (buttons, touchscreens), introducing several limitations:
 
 - Physical contact in harsh or contaminated environments
@@ -56,6 +62,15 @@ Traditional industrial HMIs rely on physical interaction (buttons, touchscreens)
 - Poor ergonomics in repetitive interaction scenarios
 
 A contactless, intelligent interaction system is needed to improve usability, flexibility, and operator experience in industrial settings.
+
+</td>
+<td valign="middle" width="45%" >
+
+<img src="./images/Problem_statement.png" width="250"/>
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -99,6 +114,40 @@ STM32F747I Discovery Kit
 Industrial Dashboard Display
 ```
 
+---
+
+## 🗂 System Diagrams
+
+### Data Flow Diagram
+
+![Data Flow Diagram](./images/Data_Flow_Diagram.png)
+
+### Sequence Diagram
+
+![Sequence Diagram](./images/Sequence_diagram.png)
+
+---
+
+### 📸 System Snapshots
+
+<div align="center">
+<table>
+<tr>
+  <td ><img src="./images/system_snapchot_1.jpg" width="340"/></td>
+  <td ><img src="./images/system_snapchot_2.jpg" width="340"/></td>
+</tr>
+</table>
+</div>
+<div align="center">
+<table>
+<tr>
+  <td><img src="./images/system_snapchot_3.jpg" width="340"/></td>
+  <td><img src="./images/system_snapchot_4.jpg" width="340"/></td>
+  <td><img src="./images/system_snapchot_5.jpg" width="340"/></td>
+</tr>
+
+</table>
+</div>
 ---
 
 ## 🔧 Hardware Components
@@ -167,7 +216,7 @@ A custom dataset was created and manually annotated using **Edge Impulse**.
 3. Feature Extraction   →  Gesture class + hand centroid (x, y) extracted
 4. Signal Processing    →  EMA smoothing + gesture debouncing
 5. Communication        →  Data sent via UART
-                           Format: <X:120,Y:85,G:PALM>
+                           Format: <x,y,gesture>
 6. Embedded Processing  →  STM32 parses data, maps to screen, triggers events
 7. UI Rendering         →  TouchGFX renders dashboard via LTDC
 ```
@@ -210,23 +259,127 @@ The graphical interface was developed using the **TouchGFX** embedded GUI framew
 
 ---
 
+## 📡 Real-Time UART Protocol (AI → STM32)
+
+The Raspberry Pi sends real-time gesture tracking data to the STM32 using UART.
+
+### 📦 Packet Format
+
+```
+<x,y,gesture>
+```
+
+### 📌 Example Packets
+
+```
+120,80,1
+200,140,0
+```
+
+| Field   | Description                  |
+| ------- | ---------------------------- |
+| x       | Hand centroid X (FOMO space) |
+| y       | Hand centroid Y (FOMO space) |
+| gesture | 1 = palm, 0 = fist           |
+
+---
+
+### ⏱ Transmission Rate
+
+- UART send interval: **30 ms (~33 Hz)**
+- Controlled in Python using:
+
+```python
+SEND_INTERVAL = 0.03
+```
+
+### ⚙️ Processing Pipeline
+
+**Raspberry Pi:**
+
+```
+AI detection → filtering → centroid extraction → UART packet
+```
+
+**STM32:**
+
+```
+UART RX → parse packet → scale coordinates → update cursor → detect gesture event
+```
+
+---
+
+## 🧠 Current Interaction Model (HMI Phase 2)
+
+The system now supports real-time touchless interaction.
+
+### 🖐 Gesture Mapping
+
+| Gesture | Action                       |
+| ------- | ---------------------------- |
+| Palm    | Cursor movement              |
+| Fist    | Click event (edge-triggered) |
+
+---
+
+### 🖱 Click Detection Logic
+
+A click is detected **only** on a `Palm → Fist` transition.
+
+This prevents repeated click triggering during sustained fist gestures.
+
+---
+
+### 🎯 UI Interaction
+
+- Cursor moves in real-time over LCD
+- Collision detection with UI elements (buttons/switches)
+- Toggle interaction implemented (ON/OFF switch)
+
+---
+
+### ⚡ Rendering Strategy
+
+| Strategy                   | Used |
+| -------------------------- | ---- |
+| Full-screen redraw         | ❌   |
+| Partial framebuffer update | ✅   |
+
+- Only the cursor area (~100 pixels) is updated per frame
+- LTDC continuously scans SDRAM framebuffer
+
+---
+
 ## ⚡ Performance & Optimization
 
 ### Latency Breakdown
 
-| Block              | Latency   |
-| ------------------ | --------- |
-| AI Inference       | ~30–60 ms |
-| UART Communication | ~1–2 ms   |
-| STM32 Rendering    | < 5 ms    |
+| Block                               | Estimated Latency |
+| ----------------------------------- | ----------------- |
+| AI Detection Loop (Pi Runtime)      | ~3–4 ms           |
+| AI Inference + Detection Pipeline   | ~30–60 ms         |
+| UART Transmission                   | ~1–2 ms           |
+| STM32 Packet Parsing                | < 1 ms            |
+| Coordinate Scaling & Mapping        | < 1 ms            |
+| Partial Framebuffer Redraw          | < 5 ms            |
+| **Total End-to-End System Latency** | **~35–70 ms**     |
+
+> 🖱 Effective cursor update rate: **~33 Hz**
+> (limited intentionally by the 30 ms UART transmission interval)
+
+---
 
 ### Optimization Techniques
 
-- INT8 Quantization
+- INT8 quantization
 - Lightweight FOMO architecture
 - Reduced input resolution
-- Efficient UART packet structure
-- Coordinate smoothing (EMA)
+- UART rate limiting (~33 Hz)
+- Partial framebuffer rendering
+- Cursor-only redraw regions
+- Coordinate smoothing (EMA / low-pass filter)
+- Interrupt-driven UART reception
+- SDRAM framebuffer acceleration via LTDC
 
 ---
 
@@ -248,7 +401,50 @@ The graphical interface was developed using the **TouchGFX** embedded GUI framew
 
 ### Concepts
 
-Edge AI · Computer Vision · CNNs · Embedded Systems · Real-Time Systems · UART Communication · LTDC Graphics · Signal Processing
+Edge AI · Computer Vision · CNNs · Embedded Systems · Real-Time Systems · UART Communication · LTDC Graphics · Signal Processing · Framebuffer Rendering · Coordinate Scaling
+
+---
+
+## 📊 Current Status
+
+### ✅ Completed
+
+- Edge AI gesture detection (Raspberry Pi)
+- UART real-time communication pipeline
+- STM32 UART interrupt-driven receiver
+- Coordinate scaling (AI → LCD mapping: 96×96 → 480×272)
+- Smooth cursor motion (low-pass filter)
+- Partial framebuffer rendering (optimized graphics)
+- Cursor save/restore mechanism for efficient redraw
+- Static industrial HMI layout (top bar, main area, bottom navigation)
+- Interactive UI element (toggle switch with collision detection)
+- Gesture-based click system (Palm → Fist edge detection)
+
+### 🚧 Current Phase
+
+👉 **Phase 2: AI-driven real-time cursor HMI**
+
+The system has transitioned from:
+
+```
+Static framebuffer rendering  →  Interactive GUI system
+```
+
+Now supporting:
+
+- Real-time cursor movement driven by AI centroid
+- Gesture-based interaction (click on Palm → Fist transition)
+- UI element activation (toggle switch)
+
+---
+
+## 🔮 Future Improvements
+
+- Additional gesture classes (swipe, zoom, rotate)
+- Multi-element UI interaction
+- Wireless communication (Wi-Fi / BLE) replacing UART
+- Feedback mechanisms (haptic / audio)
+- Deployment on additional embedded targets
 
 ---
 
