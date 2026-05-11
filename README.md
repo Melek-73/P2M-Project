@@ -126,8 +126,11 @@ Industrial Dashboard Display
 ![Sequence Diagram](./images/Sequence_diagram.png)
 
 ---
+
 ## Video demo
-https://github.com/user-attachments/assets/915b622f-7370-4abb-9470-76bebfe4a54d
+https://github.com/user-attachments/assets/d7f16bd4-3603-435d-9a10-8a7372e2ee09
+
+
 
 
 ### 📸 System Snapshots
